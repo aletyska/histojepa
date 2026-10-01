@@ -7,7 +7,7 @@
 
 **Master's Thesis in Applied Computing — UNISINOS**  
 *Thesis Title:* HistoJEPA: A Joint Embedding Predictive Architecture for the Clustering and Detection of Tumor Buds in Colorectal Cancer Whole Slide Images  
-*Academic Advisor:* Prof. Dr. Gabriel de Oliveira Ramos | *Co-Advisor:* Prof. Dr. Felipe Barbosa
+*Advisor:* Prof. Dr. Cristiano André da Costa | *Co-Advisor:* Prof. Dr. Adriana Vial Roehe
 
 ---
 
