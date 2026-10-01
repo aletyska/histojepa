@@ -4,7 +4,10 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "marimo>=0.25.0",
+    "torch>=2.14.1",
+]
 
 [project.scripts]
 histojepa = "histojepa:main"
