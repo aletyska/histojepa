@@ -13,9 +13,9 @@
 
 ## 📌 Executive Summary
 
-**HistoJEPA** is a dual-pipeline computational pathology framework designed to automate the detection and curation of **Tumor Buds (TBs)**—microscopic, high-risk 1-to-4 cell clusters along the invasive front of Colorectal Cancer (CRC) Whole Slide Images (WSIs) \cite{zlobec2020tumour}. 
+**HistoJEPA** is a dual-pipeline computational pathology framework designed to automate the detection and curation of **Tumor Buds (TBs)**—microscopic, high-risk 1-to-4 cell clusters along the invasive front of Colorectal Cancer (CRC) Whole Slide Images (WSIs). 
 
-By leveraging self-supervised representation learning via an **Image-based Joint-Embedding Predictive Architecture (I-JEPA)** \cite{ijepa} on a Vision Transformer (ViT) backbone \cite{dosovitskiy2021}, HistoJEPA eliminates the need for expensive pixel-level reconstructions or manual single-cell bounding box annotations across entire clinical cohorts.
+By leveraging self-supervised representation learning via an **Image-based Joint-Embedding Predictive Architecture (I-JEPA)** on a Vision Transformer (ViT) backbone, HistoJEPA eliminates the need for expensive pixel-level reconstructions or manual single-cell bounding box annotations across entire clinical cohorts.
 
 ```text
                                   [ Raw WSI Tissue Patches ]
@@ -44,10 +44,10 @@ By leveraging self-supervised representation learning via an **Image-based Joint
 ## 🏛️ System Architecture
 
 ### 1. Phase 1: Self-Supervised Representation Learning (I-JEPA)
-Pre-trains a non-hierarchical ViT-Base backbone \cite{dosovitskiy2021} using I-JEPA's non-generative semantic prediction in representation space \cite{ijepa}. The Context Encoder processes $85\%\text{--}100\%$ masked tissue tiles, predicting the high-dimensional latent embeddings of target blocks without decoding raw RGB pixels.
+Pre-trains a non-hierarchical ViT-Base backbone using I-JEPA's non-generative semantic prediction in representation space . The Context Encoder processes $85\%\text{--}100\%$ masked tissue tiles, predicting the high-dimensional latent embeddings of target blocks without decoding raw RGB pixels.
 
 ### 2. Branch A: Supervised Object Detection (ViTDet)
-Connects the frozen ViT Context Encoder to Meta AI's ViTDet Simple Feature Pyramid (SFP) \cite{ijepa}. The SFP constructs multi-scale feature maps ($P_2, P_3, P_4, P_5$ at strides 4, 8, 16, 32) post-backbone, enabling a lightweight detection head to regress bounding box coordinates around microscopic tumor buds on the TB-YOLO / TBCMU benchmark \cite{tb_yolo_dataset}.
+Connects the frozen ViT Context Encoder to Meta AI's ViTDet Simple Feature Pyramid (SFP). The SFP constructs multi-scale feature maps ($P_2, P_3, P_4, P_5$ at strides 4, 8, 16, 32) post-backbone, enabling a lightweight detection head to regress bounding box coordinates around microscopic tumor buds on the TB-YOLO / TBCMU benchmark.
 
 ### 3. Branch B: Unsupervised Clustering & HITL Bulk-Annotation
 Operates directly on the frozen $\mathbb{R}^D$ latent representations. Uses unsupervised clustering algorithms (K-Means, DBSCAN, Spectral Clustering) and UMAP dimensionality reduction to power a Human-in-the-Loop (HITL) Marimo web application. Pathologists can inspect cluster centroids via representative RGB patch galleries and apply 1-click bulk annotations to thousands of patches simultaneously.
