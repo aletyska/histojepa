@@ -37,7 +37,12 @@ histojepa/
 │   ├── val/            <-- images/ (raw 1280x1280), labels/ (YOLO txt), processed/ (patches/treated)
 │   └── test/           <-- images/ (raw 1280x1280), labels/ (YOLO txt), processed/ (patches/treated)
 ├── src/histojepa/      <-- ALL reusable PyTorch models, data loaders, and metrics GO HERE.
-├── notebooks/          <-- ONLY marimo notebook drivers (.py files) GO HERE.
+├── notebooks/          <-- ONLY marimo notebook drivers (.py files) GO HERE:
+│   ├── 00_index.py                   # Central Project Dashboard
+│   ├── 01_Data_Preparation.py        # Image pre-processing & patch preparation
+│   ├── 02_Phase_1_IJEPA_PreTrain.py   # I-JEPA SSL pre-training, frozen ViT encoder & linear probe
+│   ├── 03_Phase_2_Branch_A.py        # Branch A: ViTDet SFP training to evaluation
+│   └── 04_Phase_2_Branch_B.py        # Branch B: Cluster tuning, interactive HITL app & evaluation
 ├── configs/            <-- YAML files for experiment hyperparameters.
 └── tests/              <-- pytest unit tests for model shapes and metrics.
 ```

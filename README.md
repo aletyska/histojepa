@@ -86,14 +86,10 @@ histojepa/
 │       └── utils/                  # Visualization & checkpoint handlers
 ├── notebooks/                      # Marimo reactive notebooks (.py format)
 │   ├── 00_index.py                 # Central Project Dashboard
-│   ├── 01_data_prep_and_splits.py  # Patch extraction, image treatment & dataset verification
-│   ├── 02_phase1_ijepa_pretrain.py # I-JEPA SSL pre-training loop
-│   ├── 03_phase1_linear_probe.py   # Representation benchmarking
-│   ├── 04_branch_a_vitdet_train.py # ViTDet supervised fine-tuning
-│   ├── 05_branch_a_evaluation.py   # Test set mAP/F1 & label efficiency curves
-│   ├── 06_branch_b_cluster_tuning.py# Validation set cluster exploration
-│   ├── 07_branch_b_hitl_app.py     # Interactive Pathologist HITL Marimo App
-│   └── 08_branch_b_evaluation.py  # Test set Cluster Purity %, ARI, NMI
+│   ├── 01_Data_Preparation.py        # Image pre-processing, patch extraction & dataset verification
+│   ├── 02_Phase_1_IJEPA_PreTrain.py   # I-JEPA SSL pre-training, frozen ViT encoder & linear probe benchmark
+│   ├── 03_Phase_2_Branch_A.py        # Branch A end-to-end pipeline: ViTDet SFP training to evaluation
+│   └── 04_Phase_2_Branch_B.py        # Branch B end-to-end pipeline: cluster tuning, HITL app & evaluation
 └── outputs/                        # Checkpoints, logs, and figures (git-ignored)
 ```
 
@@ -141,7 +137,7 @@ source .venv/bin/activate
 uv run marimo edit notebooks/00_index.py
 
 # Launch the interactive Pathologist HITL Web Application
-uv run marimo run notebooks/07_branch_b_hitl_app.py
+uv run marimo run notebooks/04_Phase_2_Branch_B.py
 ```
 
 ---
