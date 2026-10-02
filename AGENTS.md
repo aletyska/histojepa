@@ -10,7 +10,7 @@ This document provides mandatory context, technical constraints, coding conventi
 
 ### Core Architectural Mandates:
 1. **Phase 1 (I-JEPA):** Pre-trains a plain ViT-Base backbone (`timm` ViT) via non-generative joint-embedding prediction in latent space \cite{ijepa}.
-2. **Phase 2 - Branch A (Supervised Detection):** Connects Meta AI's **ViTDet Simple Feature Pyramid (SFP)** to the **strictly frozen** ViT Context Encoder. Only the SFP and detection head are trained using ground-truth bounding box labels from the TB-YOLO dataset \cite{tb_yolo_dataset}.
+2. **Phase 2 - Branch A (Supervised Detection):** Connects Meta AI's **ViTDet Simple Feature Pyramid (SFP)** to the **strictly frozen** ViT Context Encoder. Only the SFP and detection head are trained using ground-truth bounding box labels from the TB-YOLO dataset (derived from TBCMU, pre-split) \cite{tb_yolo_dataset}.
 3. **Phase 2 - Branch B (Unsupervised Clustering):** Extracts $\mathbb{R}^D$ feature vectors from the **strictly frozen** ViT Context Encoder and applies K-Means/DBSCAN/Spectral clustering and UMAP for Human-in-the-Loop (HITL) bulk-annotation.
 
 ---
@@ -32,6 +32,10 @@ Agents MUST strictly follow these environment rules:
 
 ```text
 histojepa/
+├── data/               <-- TB-YOLO dataset (derived from TBCMU, pre-split into train/val/test).
+│   ├── train/          <-- images/ (raw 1280x1280), labels/ (YOLO txt), processed/ (patches/treated)
+│   ├── val/            <-- images/ (raw 1280x1280), labels/ (YOLO txt), processed/ (patches/treated)
+│   └── test/           <-- images/ (raw 1280x1280), labels/ (YOLO txt), processed/ (patches/treated)
 ├── src/histojepa/      <-- ALL reusable PyTorch models, data loaders, and metrics GO HERE.
 ├── notebooks/          <-- ONLY marimo notebook drivers (.py files) GO HERE.
 ├── configs/            <-- YAML files for experiment hyperparameters.
@@ -52,8 +56,12 @@ histojepa/
 * Gradients in Branch A must flow only through the Simple Feature Pyramid (SFP) and the detection head.
 
 ### 2. Patient-Level Data Splits (Preventing Data Leakage)
-* Histopathology WSI patches extracted from the same patient/WSI MUST belong to the same split (Train, Validation, or Test).
-* Never perform random patch-level splitting across WSIs. Check `src/histojepa/data/splits.py` to ensure patient IDs are partitioned strictly without overlap.
+* The primary benchmark dataset is **TB-YOLO** (derived from TBCMU), which comes already partitioned into `train`, `val`, and `test` splits to guarantee patient-level isolation without cross-split leakage.
+* Never perform random patch-level splitting across splits. Respect the existing train/val/test partitions.
+* Each split contains:
+  * `images/`: Raw histopathology images (1280×1280 RGB).
+  * `labels/`: Ground-truth bounding boxes in YOLO format (`.txt`: `<class> <x_center> <y_center> <width> <height>`).
+  * `processed/`: Storage location for extracted patches (e.g. 224×224 tiles) and treated/preprocessed images.
 
 ### 3. Tensor Dimension Conventions
 When implementing model components, document tensor shapes explicitly in docstrings using BCHW or Sequence notation:

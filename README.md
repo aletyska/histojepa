@@ -47,7 +47,7 @@ By leveraging self-supervised representation learning via an **Image-based Joint
 Pre-trains a non-hierarchical ViT-Base backbone using I-JEPA's non-generative semantic prediction in representation space . The Context Encoder processes $85\%\text{--}100\%$ masked tissue tiles, predicting the high-dimensional latent embeddings of target blocks without decoding raw RGB pixels.
 
 ### 2. Branch A: Supervised Object Detection (ViTDet)
-Connects the frozen ViT Context Encoder to Meta AI's ViTDet Simple Feature Pyramid (SFP). The SFP constructs multi-scale feature maps ($P_2, P_3, P_4, P_5$ at strides 4, 8, 16, 32) post-backbone, enabling a lightweight detection head to regress bounding box coordinates around microscopic tumor buds on the TB-YOLO / TBCMU benchmark.
+Connects the frozen ViT Context Encoder to Meta AI's ViTDet Simple Feature Pyramid (SFP). The SFP constructs multi-scale feature maps ($P_2, P_3, P_4, P_5$ at strides 4, 8, 16, 32) post-backbone, enabling a lightweight detection head to regress bounding box coordinates around microscopic tumor buds on the TB-YOLO benchmark (derived from TBCMU).
 
 ### 3. Branch B: Unsupervised Clustering & HITL Bulk-Annotation
 Operates directly on the frozen $\mathbb{R}^D$ latent representations. Uses unsupervised clustering algorithms (K-Means, DBSCAN, Spectral Clustering) and UMAP dimensionality reduction to power a Human-in-the-Loop (HITL) Marimo web application. Pathologists can inspect cluster centroids via representative RGB patch galleries and apply 1-click bulk annotations to thousands of patches simultaneously.
@@ -65,19 +65,28 @@ histojepa/
 │   ├── phase1_ijepa.yaml
 │   ├── branch_a_vitdet.yaml
 │   └── branch_b_clustering.yaml
-├── data/                           # Local datasets (git-ignored)
-│   ├── raw/                        # TBCMU WSI files
-│   ├── processed/                  # Extracted 1280x1280 & 224x224 patches
-│   └── splits/                     # Leak-free patient-level split JSONs
+├── data/                           # TB-YOLO dataset (derived from TBCMU, pre-split)
+│   ├── train/                      # Training split
+│   │   ├── images/                 # Raw images (1280x1280 RGB)
+│   │   ├── labels/                 # YOLO format tumor bud annotations (.txt)
+│   │   └── processed/              # Extracted patches & treated images
+│   ├── val/                        # Validation split
+│   │   ├── images/                 # Raw images (1280x1280 RGB)
+│   │   ├── labels/                 # YOLO format tumor bud annotations (.txt)
+│   │   └── processed/              # Extracted patches & treated images
+│   └── test/                       # Test split
+│       ├── images/                 # Raw images (1280x1280 RGB)
+│       ├── labels/                 # YOLO format tumor bud annotations (.txt)
+│       └── processed/              # Extracted patches & treated images
 ├── src/                            # Core Python package
 │   └── histojepa/
-│       ├── data/                   # Dataset loaders & WSI tiling utilities
+│       ├── data/                   # Dataset loaders & patch processing utilities
 │       ├── models/                 # PyTorch Modules (I-JEPA, ViTDet SFP, Clustering)
 │       ├── evaluation/             # Metrics suite (mAP, F1, Purity %, ARI, NMI)
 │       └── utils/                  # Visualization & checkpoint handlers
 ├── notebooks/                      # Marimo reactive notebooks (.py format)
 │   ├── 00_index.py                 # Central Project Dashboard
-│   ├── 01_data_prep_and_splits.py  # Patch extraction & split generation
+│   ├── 01_data_prep_and_splits.py  # Patch extraction, image treatment & dataset verification
 │   ├── 02_phase1_ijepa_pretrain.py # I-JEPA SSL pre-training loop
 │   ├── 03_phase1_linear_probe.py   # Representation benchmarking
 │   ├── 04_branch_a_vitdet_train.py # ViTDet supervised fine-tuning
@@ -87,6 +96,21 @@ histojepa/
 │   └── 08_branch_b_evaluation.py  # Test set Cluster Purity %, ARI, NMI
 └── outputs/                        # Checkpoints, logs, and figures (git-ignored)
 ```
+
+---
+
+## 💾 Dataset & Data Organization
+
+The project uses **TB-YOLO**, a derived dataset from the **TBCMU** benchmark (Tumor Budding in Colorectal Cancer Whole Slide Images).
+
+### Key Dataset Attributes:
+* **Pre-Split Partitions:** The dataset is already partitioned into `train/`, `val/`, and `test/` sets, preserving strict patient-level separation to prevent data leakage.
+* **Tumor Bud Annotations:** Annotations are provided as normalized YOLO bounding box text files (`class x_center y_center width height`).
+* **Directory Structure:**
+  Each split folder contains three subdirectories:
+  * `images/`: Original raw histopathology images (1280×1280 RGB).
+  * `labels/`: Text files (`.txt`) containing the ground-truth YOLO tumor bud annotations.
+  * `processed/`: Storage for extracted patches (e.g., 224×224 tiles for ViT/I-JEPA) and treated/preprocessed images.
 
 ---
 

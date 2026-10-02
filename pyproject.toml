@@ -1,7 +1,7 @@
 [project]
 name = "histojepa"
 version = "0.1.0"
-description = "Add your description here"
+description = "Joint Embedding Predictive Architecture for clustering and detection of tumor buds in colorectal cancer (TB-YOLO)"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
