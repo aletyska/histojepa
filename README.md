@@ -80,7 +80,10 @@ histojepa/
 │       └── processed/              # Extracted patches & treated images
 ├── src/                            # Core Python package
 │   └── histojepa/
-│       ├── data/                   # Dataset loaders & patch processing utilities
+│       ├── data/                   # Preprocessing & dataset utilities
+│       │   ├── tissue_mask.py      # Otsu thresholding & background noise removal
+│       │   ├── stain_norm.py       # Reinhard color normalization (OpenCV Lab space)
+│       │   └── pipeline.py         # Idempotent batch pipeline
 │       ├── models/                 # PyTorch Modules (I-JEPA, ViTDet SFP, Clustering)
 │       ├── evaluation/             # Metrics suite (mAP, F1, Purity %, ARI, NMI)
 │       └── utils/                  # Visualization & checkpoint handlers
@@ -90,6 +93,9 @@ histojepa/
 │   ├── 02_Phase_1_IJEPA_PreTrain.py   # I-JEPA SSL pre-training, frozen ViT encoder & linear probe benchmark
 │   ├── 03_Phase_2_Branch_A.py        # Branch A end-to-end pipeline: ViTDet SFP training to evaluation
 │   └── 04_Phase_2_Branch_B.py        # Branch B end-to-end pipeline: cluster tuning, HITL app & evaluation
+├── tests/                          # pytest unit tests partitioned by notebook
+│   ├── conftest.py                 # Shared synthetic test fixtures
+│   └── nb01_data_prep/             # Tests bound to 01_Data_Preparation.py (marker: nb01)
 └── outputs/                        # Checkpoints, logs, and figures (git-ignored)
 ```
 
@@ -131,7 +137,39 @@ uv sync
 source .venv/bin/activate
 ```
 
-### 3. Running Notebooks with Marimo
+### 3. Data Preparation & Preprocessing
+The data preparation pipeline applies **Otsu automated thresholding** for background noise removal and **Reinhard color normalization** in Lab space for CK-stained slides.
+
+Launch the interactive Marimo notebook:
+```bash
+uv run marimo edit notebooks/01_Data_Preparation.py
+```
+
+Or execute the pipeline directly via CLI:
+```bash
+# Process a single split
+uv run python -m histojepa.data.pipeline --split train --workers 4
+
+# Process the entire dataset (train, val, test)
+uv run python -m histojepa.data.pipeline --split all --workers 4
+
+# Process a single image
+uv run python -m histojepa.data.pipeline --single 1.png --split train
+```
+
+### 4. Running Unit Tests
+Unit tests are partitioned by notebook phase:
+```bash
+# Run tests bound to Notebook 01 (Data Preparation)
+uv run pytest tests/nb01_data_prep -v
+# or via marker:
+uv run pytest -m nb01 -v
+
+# Run full project test suite
+uv run pytest
+```
+
+### 5. Running Notebooks with Marimo
 ```bash
 # Open the central Project Dashboard
 uv run marimo edit notebooks/00_index.py

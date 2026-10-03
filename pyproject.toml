@@ -6,7 +6,12 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "marimo>=0.25.0",
+    "matplotlib>=3.11.2",
+    "numpy>=2.5.3",
+    "opencv-python>=5.0.0.93",
+    "pillow>=12.3.0",
     "torch>=2.14.1",
+    "tqdm>=4.70.1",
 ]
 
 [project.scripts]
@@ -15,3 +20,20 @@ histojepa = "histojepa:main"
 [build-system]
 requires = ["uv_build>=0.12.7,<0.13.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "nb01: Tests bound to notebooks/01_Data_Preparation.py (tissue masking, stain norm, data prep pipeline)",
+    "nb02: Tests bound to notebooks/02_Phase_1_IJEPA_PreTrain.py",
+    "nb03: Tests bound to notebooks/03_Phase_2_Branch_A.py",
+    "nb04: Tests bound to notebooks/04_Phase_2_Branch_B.py",
+]

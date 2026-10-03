@@ -36,7 +36,14 @@ histojepa/
 │   ├── train/          <-- images/ (raw 1280x1280), labels/ (YOLO txt), processed/ (patches/treated)
 │   ├── val/            <-- images/ (raw 1280x1280), labels/ (YOLO txt), processed/ (patches/treated)
 │   └── test/           <-- images/ (raw 1280x1280), labels/ (YOLO txt), processed/ (patches/treated)
-├── src/histojepa/      <-- ALL reusable PyTorch models, data loaders, and metrics GO HERE.
+├── src/histojepa/      <-- ALL reusable PyTorch models, data loaders, and metrics GO HERE:
+│   ├── data/           <-- Preprocessing, stain norm, and dataset loaders:
+│   │   ├── tissue_mask.py      # Otsu automated thresholding & background noise removal
+│   │   ├── stain_norm.py       # Reinhard color normalization in OpenCV Lab space
+│   │   └── pipeline.py         # Batch pipeline & idempotent split processing
+│   ├── models/         <-- PyTorch modules (I-JEPA, ViTDet SFP, heads)
+│   ├── evaluation/     <-- Metrics suite (mAP, F1, ARI, NMI)
+│   └── utils/          <-- Checkpoints & visualization helpers
 ├── notebooks/          <-- ONLY marimo notebook drivers (.py files) GO HERE:
 │   ├── 00_index.py                   # Central Project Dashboard
 │   ├── 01_Data_Preparation.py        # Image pre-processing & patch preparation
@@ -44,7 +51,12 @@ histojepa/
 │   ├── 03_Phase_2_Branch_A.py        # Branch A: ViTDet SFP training to evaluation
 │   └── 04_Phase_2_Branch_B.py        # Branch B: Cluster tuning, interactive HITL app & evaluation
 ├── configs/            <-- YAML files for experiment hyperparameters.
-└── tests/              <-- pytest unit tests for model shapes and metrics.
+└── tests/              <-- pytest unit tests partitioned by notebook:
+    ├── conftest.py                   # Shared synthetic fixtures
+    ├── nb01_data_prep/               # Tests bound to 01_Data_Preparation.py (marker: nb01)
+    ├── nb02_phase1_ijepa/            # Tests bound to 02_Phase_1_IJEPA_PreTrain.py (marker: nb02)
+    ├── nb03_phase2_branch_a/         # Tests bound to 03_Phase_2_Branch_A.py (marker: nb03)
+    └── nb04_phase2_branch_b/         # Tests bound to 04_Phase_2_Branch_B.py (marker: nb04)
 ```
 
 ### Critical Placement Guidelines:
@@ -84,6 +96,8 @@ When implementing model components, document tensor shapes explicitly in docstri
 ## 🧪 Testing & Validation Expectations
 
 Before committing generated code:
-* Run `uv run pytest` to ensure unit tests pass.
+* Run unit tests bound to the current notebook:
+  * For Notebook 01: `uv run pytest tests/nb01_data_prep` (or `uv run pytest -m nb01`)
+  * For full regression suite: `uv run pytest`
 * Verify that `SimpleFeaturePyramid` handles tensor upsampling/downsampling without throwing spatial dimension mismatch errors.
 * Verify that evaluation metrics handle empty bounding box predictions gracefully without raising `ZeroDivisionError`.
