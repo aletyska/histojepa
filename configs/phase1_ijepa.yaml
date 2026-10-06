@@ -1,0 +1,54 @@
+# Phase 1 — I-JEPA Self-Supervised Pre-Training Configuration
+# Ref: Assran et al., I-JEPA (papers/ijepa/ijepa.md), §3 & Appendix A.1
+
+data:
+  root: data
+  split: train                 # strictly train/processed
+  image_size: 1280             # native TB-YOLO resolution (80x80 = 6,400 patches)
+  mean: [0.485, 0.456, 0.406]
+  std:  [0.229, 0.224, 0.225]
+  num_workers: 4
+
+model:
+  encoder:                     # ViT-B/16 (App. A.1), random init, no [cls] token
+    patch_size: 16
+    hidden_size: 768
+    num_hidden_layers: 12
+    num_attention_heads: 12
+    intermediate_size: 3072
+    attn_implementation: sdpa
+  predictor:                   # Narrow ViT (App. A.1): width 384, depth 6, heads 12
+    embed_dim: 384
+    depth: 6
+    num_heads: 12
+    mlp_ratio: 4.0
+
+masking:                       # §3 "Targets"/"Context", App. A.1 "Masking"
+  num_targets: 4               # M = 4
+  target_scale: [0.15, 0.2]
+  target_aspect_ratio: [0.75, 1.5]
+  context_scale: [0.85, 1.0]
+  context_aspect_ratio: [1.0, 1.0]   # unit aspect ratio
+  min_context_keep: 10         # resample if overlap removal leaves < 10 ctx patches
+
+optimization:                  # App. A.1 "Optimization"
+  epochs: 100
+  micro_batch_size: 2
+  grad_accum_steps: 16         # effective batch size = 32
+  warmup_epochs: 15
+  start_lr: 1.0e-4
+  ref_lr: 1.0e-3
+  final_lr: 1.0e-6
+  lr_scaling: sqrt             # sqrt(32 / 2048) scaling -> peak LR = 1.25e-4
+  start_wd: 0.04
+  final_wd: 0.4
+  ema_momentum: [0.996, 1.0]   # linearly increased from 0.996 to 1.0
+  amp_dtype: bfloat16
+  gradient_checkpointing: false
+  seed: 42
+
+output:
+  dir: outputs/phase1_ijepa
+  save_every_epochs: 1
+  keep_last: 3
+  export_dir: outputs/phase1_ijepa/context_encoder_frozen

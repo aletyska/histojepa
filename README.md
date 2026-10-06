@@ -78,6 +78,7 @@ histojepa/
 │       ├── images/                 # Raw images (1280x1280 RGB)
 │       ├── labels/                 # YOLO format tumor bud annotations (.txt)
 │       └── processed/              # Extracted patches & treated images
+├── papers/                         # Local-only reference papers in Markdown (git-ignored)
 ├── src/                            # Core Python package
 │   └── histojepa/
 │       ├── data/                   # Preprocessing & dataset utilities
@@ -90,12 +91,15 @@ histojepa/
 ├── notebooks/                      # Marimo reactive notebooks (.py format)
 │   ├── 00_index.py                 # Central Project Dashboard
 │   ├── 01_Data_Preparation.py        # Image pre-processing, patch extraction & dataset verification
-│   ├── 02_Phase_1_IJEPA_PreTrain.py   # I-JEPA SSL pre-training, frozen ViT encoder & linear probe benchmark
+│   ├── 02_Phase_1_IJEPA_PreTrain.py   # I-JEPA SSL pre-training & frozen Context Encoder export
 │   ├── 03_Phase_2_Branch_A.py        # Branch A end-to-end pipeline: ViTDet SFP training to evaluation
 │   └── 04_Phase_2_Branch_B.py        # Branch B end-to-end pipeline: cluster tuning, HITL app & evaluation
 ├── tests/                          # pytest unit tests partitioned by notebook
 │   ├── conftest.py                 # Shared synthetic test fixtures
-│   └── nb01_data_prep/             # Tests bound to 01_Data_Preparation.py (marker: nb01)
+│   ├── nb01_data_prep/             # Tests bound to 01_Data_Preparation.py (marker: nb01)
+│   ├── nb02_phase1_ijepa/          # Tests bound to 02_Phase_1_IJEPA_PreTrain.py (marker: nb02)
+│   ├── nb03_phase2_branch_a/       # Tests bound to 03_Phase_2_Branch_A.py (marker: nb03)
+│   └── nb04_phase2_branch_b/       # Tests bound to 04_Phase_2_Branch_B.py (marker: nb04)
 └── outputs/                        # Checkpoints, logs, and figures (git-ignored)
 ```
 
@@ -182,6 +186,6 @@ uv run marimo run notebooks/04_Phase_2_Branch_B.py
 
 ## 📊 Quantitative Metrics Suite
 
-- **Phase 1:** $L_2$ Latent Prediction Loss, Linear Probing Accuracy, Silhouette Score.
+- **Phase 1:** $L_2$ Latent Prediction Loss (training objective).
 - **Branch A (Detection):** $\text{mAP}_{50-95}$, IoU, Precision, Recall, $F_1$-Score, Label Efficiency Curve (10%, 25%, 50%, 100% annotations).
 - **Branch B (Clustering & HITL):** Cluster Purity %, Adjusted Rand Index (ARI), Normalized Mutual Information (NMI), HCI Time-per-1,000-Annotations.

@@ -12,6 +12,7 @@ from histojepa.data.pipeline import (
     ProcessingStats,
     SUPPORTED_SPLITS,
 )
+from histojepa.data.ijepa_dataset import ProcessedImageDataset
 
 __all__ = [
     "OtsuSegmenter",
@@ -22,4 +23,5 @@ __all__ = [
     "prepare_image",
     "ProcessingStats",
     "SUPPORTED_SPLITS",
+    "ProcessedImageDataset",
 ]

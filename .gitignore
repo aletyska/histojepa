@@ -220,3 +220,6 @@ __marimo__/
 # Project data and outputs
 /data/
 /outputs/
+
+# Reference papers (copyrighted, local only — never commit)
+/papers/
