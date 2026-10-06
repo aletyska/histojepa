@@ -37,3 +37,6 @@ markers = [
     "nb03: Tests bound to notebooks/03_Phase_2_Branch_A.py",
     "nb04: Tests bound to notebooks/04_Phase_2_Branch_B.py",
 ]
+
+[tool.marimo.runtime]
+output_max_bytes = 15_000_000
