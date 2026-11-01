@@ -9,10 +9,14 @@ app = marimo.App(
 
 @app.cell(hide_code=True)
 def _():
+    import gc
     import json
     import os
     from pathlib import Path
     import time
+
+    # Prevent CUDA memory fragmentation from variable context/target mask token lengths
+    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
     import cv2
     import matplotlib.pyplot as plt
@@ -80,82 +84,6 @@ def _(Path, Phase1Config):
     default_cfg_path = Path("configs/phase1_ijepa.yaml")
     base_config = Phase1Config.from_yaml(default_cfg_path)
     return base_config, default_cfg_path
-
-
-@app.cell(hide_code=True)
-def _(Path, base_config, mo, torch):
-    # Scan existing checkpoints in output directory
-    _output_dir = Path(base_config.output.dir)
-    _available_ckpts = ["None"]
-    if _output_dir.exists():
-        _found = sorted([_p.name for _p in _output_dir.glob("*.pt") if not _p.name.startswith("context_")])
-        if "latest.pt" in _found:
-            _available_ckpts.append("latest.pt")
-        if "best_loss.pt" in _found:
-            _available_ckpts.append("best_loss.pt")
-        for _fn in _found:
-            if _fn not in _available_ckpts:
-                _available_ckpts.append(_fn)
-
-    # UI Controls
-    epochs_ui = mo.ui.slider(
-        start=1,
-        stop=100,
-        step=1,
-        value=min(base_config.optimization.epochs, 100),
-        label="**Pre-Training Epochs:**",
-    )
-
-    micro_bs_ui = mo.ui.slider(
-        start=1,
-        stop=4,
-        step=1,
-        value=base_config.optimization.micro_batch_size,
-        label="**Micro-Batch Size:**",
-    )
-
-    grad_accum_ui = mo.ui.slider(
-        start=1,
-        stop=32,
-        step=1,
-        value=base_config.optimization.grad_accum_steps,
-        label="**Gradient Accumulation Steps:**",
-    )
-
-    _device_options = ["cuda", "cpu"] if torch.cuda.is_available() else ["cpu"]
-    device_ui = mo.ui.dropdown(
-        options=_device_options,
-        value="cuda" if torch.cuda.is_available() else "cpu",
-        label="**Compute Device:**",
-    )
-
-    resume_ui = mo.ui.dropdown(
-        options=_available_ckpts,
-        value="None",
-        label="**Resume Checkpoint:**",
-    )
-
-    grad_ckpt_ui = mo.ui.checkbox(
-        value=base_config.optimization.gradient_checkpointing,
-        label="**Gradient Checkpointing** (Saves VRAM)",
-    )
-
-    mo.md(
-        f"""
-        ### ⚙️ Experiment Configuration & Hyperparameters
-        {mo.hstack([epochs_ui, micro_bs_ui, grad_accum_ui], justify="start")}
-
-        {mo.hstack([device_ui, resume_ui, grad_ckpt_ui], justify="start")}
-        """
-    )
-    return (
-        device_ui,
-        epochs_ui,
-        grad_accum_ui,
-        grad_ckpt_ui,
-        micro_bs_ui,
-        resume_ui,
-    )
 
 
 @app.cell(hide_code=True)
@@ -303,9 +231,16 @@ def _(
 
 @app.cell(hide_code=True)
 def _(base_config, grad_accum_ui, micro_bs_ui, mo):
+    import dataclasses
+
     # Model architecture and parameter summary
     _eff_batch = micro_bs_ui.value * grad_accum_ui.value
-    _start_lr, _ref_lr, _final_lr = base_config.optimization.get_effective_lrs()
+    _active_opt = dataclasses.replace(
+        base_config.optimization,
+        micro_batch_size=micro_bs_ui.value,
+        grad_accum_steps=grad_accum_ui.value,
+    )
+    _start_lr, _ref_lr, _final_lr = _active_opt.get_effective_lrs()
 
     _ctx_params = "86.4M"
     _tgt_params = "86.4M (0 trainable, EMA)"
@@ -331,6 +266,91 @@ def _(base_config, grad_accum_ui, micro_bs_ui, mo):
         """
     )
     return
+
+
+@app.cell(hide_code=True)
+def _(Path, base_config, mo, torch):
+    # Scan existing checkpoints in output directory
+    _output_dir = Path(base_config.output.dir)
+    _available_ckpts = ["None"]
+    if _output_dir.exists():
+        _found = sorted([_p.name for _p in _output_dir.glob("*.pt") if not _p.name.startswith("context_")])
+        if "latest.pt" in _found:
+            _available_ckpts.append("latest.pt")
+        if "best_loss.pt" in _found:
+            _available_ckpts.append("best_loss.pt")
+        for _fn in _found:
+            if _fn not in _available_ckpts:
+                _available_ckpts.append(_fn)
+
+    # UI Controls
+    epochs_ui = mo.ui.slider(
+        start=1,
+        stop=100,
+        step=1,
+        value=min(base_config.optimization.epochs, 100),
+        label="**Pre-Training Epochs:**",
+    )
+
+    micro_bs_ui = mo.ui.slider(
+        start=1,
+        stop=16,
+        step=1,
+        value=base_config.optimization.micro_batch_size,
+        label="**Micro-Batch Size:**",
+    )
+
+    grad_accum_ui = mo.ui.slider(
+        start=1,
+        stop=32,
+        step=1,
+        value=base_config.optimization.grad_accum_steps,
+        label="**Gradient Accumulation Steps:**",
+    )
+
+    num_workers_ui = mo.ui.slider(
+        start=0,
+        stop=16,
+        step=1,
+        value=base_config.data.num_workers,
+        label="**DataLoader Workers:**",
+    )
+
+    _device_options = ["cuda", "cpu"] if torch.cuda.is_available() else ["cpu"]
+    device_ui = mo.ui.dropdown(
+        options=_device_options,
+        value="cuda" if torch.cuda.is_available() else "cpu",
+        label="**Compute Device:**",
+    )
+
+    resume_ui = mo.ui.dropdown(
+        options=_available_ckpts,
+        value="None",
+        label="**Resume Checkpoint:**",
+    )
+
+    grad_ckpt_ui = mo.ui.checkbox(
+        value=base_config.optimization.gradient_checkpointing,
+        label="**Gradient Checkpointing** (Saves VRAM)",
+    )
+
+    mo.md(
+        f"""
+        ### ⚙️ Experiment Configuration & Hyperparameters
+        {mo.hstack([epochs_ui, micro_bs_ui, grad_accum_ui, num_workers_ui], justify="start")}
+
+        {mo.hstack([device_ui, resume_ui, grad_ckpt_ui], justify="start")}
+        """
+    )
+    return (
+        device_ui,
+        epochs_ui,
+        grad_accum_ui,
+        grad_ckpt_ui,
+        micro_bs_ui,
+        num_workers_ui,
+        resume_ui,
+    )
 
 
 @app.cell(hide_code=True)
@@ -362,6 +382,7 @@ def _(
     grad_ckpt_ui,
     micro_bs_ui,
     mo,
+    num_workers_ui,
     resume_ui,
     train_exec_btn,
 ):
@@ -371,12 +392,15 @@ def _(
 
     if train_exec_btn.value:
         _overrides = {
+            "data": {
+                "num_workers": num_workers_ui.value,
+            },
             "optimization": {
                 "epochs": epochs_ui.value,
                 "micro_batch_size": micro_bs_ui.value,
                 "grad_accum_steps": grad_accum_ui.value,
                 "gradient_checkpointing": grad_ckpt_ui.value,
-            }
+            },
         }
         _run_config = Phase1Config.from_yaml(default_cfg_path, overrides=_overrides)
 

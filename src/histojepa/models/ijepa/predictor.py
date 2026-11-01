@@ -4,12 +4,13 @@ Ref: Assran et al., I-JEPA (papers/ijepa/ijepa.md), §3 "Prediction",
 Appendix A.1 "Architectures", Appendix C "Predictor depth / Predictor width".
 """
 
-from typing import Optional, Tuple, Union
+from typing import List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.checkpoint import checkpoint
 
 from histojepa.models.ijepa.masking import apply_masks
 
@@ -122,6 +123,7 @@ class IJepaPredictor(nn.Module):
 
         self.encoder_dim = encoder_dim
         self.embed_dim = embed_dim
+        self.gradient_checkpointing: bool = False
 
         # 1. Linear bottleneck projection from encoder space to predictor space
         self.input_proj = nn.Linear(encoder_dim, embed_dim, bias=True)
@@ -180,10 +182,73 @@ class IJepaPredictor(nn.Module):
 
         # 4. Forward through predictor transformer blocks
         for block in self.blocks:
-            z = block(z)
+            if self.gradient_checkpointing and self.training:
+                z = checkpoint(block, z, use_reentrant=False)
+            else:
+                z = block(z)
         z = self.norm(z)
 
         # 5. Slice only the predicted target tokens and project to encoder dimension
         pred_target_tokens = z[:, N_c:]
         out = self.output_proj(pred_target_tokens)
         return out
+
+    def forward_multi(
+        self,
+        ctx_tokens: torch.Tensor,
+        ctx_idx: torch.Tensor,
+        tgt_idx_list: Sequence[torch.Tensor],
+    ) -> List[torch.Tensor]:
+        """Predicts representations for M target blocks in a single batched pass.
+
+        Projects context representations once and batches all M target blocks into a
+        single (M * B, N_c + N_t, embed_dim) tensor when target block lengths match,
+        maximizing Tensor Core utilization and reducing kernel launch overhead by M-fold.
+
+        Args:
+            ctx_tokens: Context encoder output tokens (B, N_c, encoder_dim).
+            ctx_idx: Context patch indices (B, N_c).
+            tgt_idx_list: Sequence of M target block index tensors, each (B, N_t).
+
+        Returns:
+            List of M predicted target block representation tensors, each (B, N_t, encoder_dim).
+        """
+        M = len(tgt_idx_list)
+        if M == 0:
+            return []
+        if M == 1:
+            return [self.forward(ctx_tokens, ctx_idx, tgt_idx_list[0])]
+
+        # Fallback if target blocks have heterogeneous token counts
+        N_t = tgt_idx_list[0].shape[1]
+        if any(t.shape[1] != N_t for t in tgt_idx_list):
+            return [self.forward(ctx_tokens, ctx_idx, idx) for idx in tgt_idx_list]
+
+        B, N_c, _ = ctx_tokens.shape
+        pos_embed_batch = self.pos_embed.expand(B, -1, -1)
+
+        # 1. Context tokens: project once and add positional encoding -> (B, N_c, embed_dim)
+        x = self.input_proj(ctx_tokens) + apply_masks(pos_embed_batch, ctx_idx)
+
+        # 2. Gather target positional encodings for all M blocks at once
+        # Stack target indices -> (M, B, N_t) -> reshape to (B, M * N_t) for single gather
+        tgt_stacked = torch.stack(list(tgt_idx_list), dim=1).reshape(B, M * N_t)
+        tgt_pos_all = apply_masks(pos_embed_batch, tgt_stacked).reshape(B, M, N_t, self.embed_dim)
+        m_all = (self.mask_token.unsqueeze(1) + tgt_pos_all).reshape(B * M, N_t, self.embed_dim)
+
+        # 3. Expand context tokens across M target blocks -> (B * M, N_c, embed_dim)
+        x_rep = x.unsqueeze(1).expand(B, M, N_c, self.embed_dim).reshape(B * M, N_c, self.embed_dim)
+
+        # 4. Concatenate and execute predictor blocks in a single (B * M) batch
+        z = torch.cat([x_rep, m_all], dim=1)
+        for block in self.blocks:
+            if self.gradient_checkpointing and self.training:
+                z = checkpoint(block, z, use_reentrant=False)
+            else:
+                z = block(z)
+        z = self.norm(z)
+
+        # 5. Slice predicted target tokens, project once, and unbind into M tensors of (B, N_t, encoder_dim)
+        pred_target_tokens = z[:, N_c:]
+        out_all = self.output_proj(pred_target_tokens).reshape(B, M, N_t, self.encoder_dim)
+        return list(out_all.unbind(dim=1))

@@ -62,16 +62,19 @@ class OptimConfig:
     final_wd: float = 0.4
     ema_momentum: Tuple[float, float] = (0.996, 1.0)
     amp_dtype: str = "bfloat16"
-    gradient_checkpointing: bool = False
+    gradient_checkpointing: bool = True
     seed: int = 42
 
     @property
     def effective_batch_size(self) -> int:
         return self.micro_batch_size * self.grad_accum_steps
 
-    def get_effective_lrs(self) -> Tuple[float, float, float]:
+    def get_effective_lrs(
+        self,
+        eff_batch_override: Optional[int] = None,
+    ) -> Tuple[float, float, float]:
         """Calculates scaled learning rates based on lr_scaling mode."""
-        eff_bs = self.effective_batch_size
+        eff_bs = eff_batch_override if eff_batch_override is not None else self.effective_batch_size
         if self.lr_scaling == "sqrt":
             factor = (eff_bs / 2048.0) ** 0.5
         elif self.lr_scaling == "linear":

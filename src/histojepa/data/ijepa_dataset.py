@@ -31,6 +31,7 @@ class ProcessedImageDataset(Dataset):
         image_size: int = 1280,
         mean: Sequence[float] = (0.485, 0.456, 0.406),
         std: Sequence[float] = (0.229, 0.224, 0.225),
+        return_uint8: bool = False,
     ):
         super().__init__()
         self.data_root = Path(data_root)
@@ -38,6 +39,7 @@ class ProcessedImageDataset(Dataset):
         self.image_size = int(image_size)
         self.mean = np.array(mean, dtype=np.float32).reshape(1, 1, 3)
         self.std = np.array(std, dtype=np.float32).reshape(1, 1, 3)
+        self.return_uint8 = bool(return_uint8)
 
         self.processed_dir = self.data_root / self.split / "processed"
         if not self.processed_dir.exists():
@@ -81,6 +83,9 @@ class ProcessedImageDataset(Dataset):
                 (self.image_size, self.image_size),
                 interpolation=cv2.INTER_AREA if (h > self.image_size or w > self.image_size) else cv2.INTER_LINEAR,
             )
+
+        if self.return_uint8:
+            return torch.from_numpy(rgb).permute(2, 0, 1).contiguous()
 
         # Convert to float32 in [0, 1] and apply channel standardisation
         norm_rgb = (rgb.astype(np.float32) / 255.0 - self.mean) / self.std

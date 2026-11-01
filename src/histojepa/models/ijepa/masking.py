@@ -176,6 +176,9 @@ class MultiBlockMaskCollator:
 
         # To enable uniform dense batch tensor operations, subsample context to batch minimum
         min_ctx_len = min(len(c) for c in batch_contexts)
+        if self.num_patches >= 256 and min_ctx_len >= 16:
+            # Align sequence length to multiple of 8 for Tensor Core / FlashAttention efficiency
+            min_ctx_len = max(self.min_context_keep, (min_ctx_len // 8) * 8)
         aligned_contexts = []
         for c in batch_contexts:
             if len(c) > min_ctx_len:

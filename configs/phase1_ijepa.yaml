@@ -7,7 +7,7 @@ data:
   image_size: 1280             # native TB-YOLO resolution (80x80 = 6,400 patches)
   mean: [0.485, 0.456, 0.406]
   std:  [0.229, 0.224, 0.225]
-  num_workers: 4
+  num_workers: 4               # tuned for Ryzen 7 5700X (8C/16T) with low pinned-RAM overhead
 
 model:
   encoder:                     # ViT-B/16 (App. A.1), random init, no [cls] token
@@ -33,8 +33,8 @@ masking:                       # §3 "Targets"/"Context", App. A.1 "Masking"
 
 optimization:                  # App. A.1 "Optimization"
   epochs: 100
-  micro_batch_size: 2
-  grad_accum_steps: 16         # effective batch size = 32
+  micro_batch_size: 8          # tuned for RTX 5060 Ti (16 GB VRAM) with gradient checkpointing
+  grad_accum_steps: 4          # effective batch size = 32
   warmup_epochs: 15
   start_lr: 1.0e-4
   ref_lr: 1.0e-3
@@ -44,7 +44,7 @@ optimization:                  # App. A.1 "Optimization"
   final_wd: 0.4
   ema_momentum: [0.996, 1.0]   # linearly increased from 0.996 to 1.0
   amp_dtype: bfloat16
-  gradient_checkpointing: false
+  gradient_checkpointing: true # required for 1280x1280 (6,400 tokens) within 16 GB VRAM
   seed: 42
 
 output:

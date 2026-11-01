@@ -94,6 +94,7 @@ class IJEPA(nn.Module):
         images: torch.Tensor,
         ctx_idx: torch.Tensor,
         tgt_idx_list: Sequence[torch.Tensor],
+        compute_stats: bool = True,
     ) -> IJepaOutput:
         """Executes one I-JEPA forward pass.
 
@@ -101,6 +102,8 @@ class IJEPA(nn.Module):
             images: Batched image tensor (B, 3, H, W).
             ctx_idx: Context token indices (B, N_c).
             tgt_idx_list: List of M target block indices, each (B, N_t).
+            compute_stats: Whether to synchronize and compute embedding std telemetry.
+                Set to False on intermediate gradient accumulation steps to avoid CPU-GPU stalls.
 
         Returns:
             IJepaOutput container with loss and monitoring statistics.
@@ -113,16 +116,20 @@ class IJEPA(nn.Module):
         # --- 2. Context Side: encode visible context tokens only ---
         s_x = self.context_encoder(images, keep_idx=ctx_idx)  # (B, N_c, D)
 
-        # --- 3. Predictor Network: evaluate M times for the M target blocks ---
-        preds = [self.predictor(s_x, ctx_idx, idx) for idx in tgt_idx_list]
+        # --- 3. Predictor Network: evaluate all M target blocks in a single batched pass ---
+        preds = self.predictor.forward_multi(s_x, ctx_idx, tgt_idx_list)
 
         # --- 4. Loss: mean L2 distance across all M blocks ---
         loss = ijepa_l2_loss(preds, targets)
 
         # --- 5. Representation collapse diagnostic (standard deviation) ---
-        with torch.no_grad():
-            target_std = float(targets[0].detach().std(dim=-1).mean().item())
-            pred_std = float(preds[0].detach().std(dim=-1).mean().item())
+        if compute_stats:
+            with torch.no_grad():
+                target_std = float(targets[0].detach().std(dim=-1).mean().item())
+                pred_std = float(preds[0].detach().std(dim=-1).mean().item())
+        else:
+            target_std = 0.0
+            pred_std = 0.0
 
         return IJepaOutput(
             loss=loss,

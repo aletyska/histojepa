@@ -40,3 +40,14 @@ def test_ijepa_predictor_forward_shape_and_bottleneck():
     assert out.shape == (B, N_t, encoder_dim)
     assert predictor.mask_token.shape == (1, 1, embed_dim)
     assert predictor.mask_token.requires_grad
+
+    # Verify forward_multi mathematical equivalence with per-block forward
+    tgt_idx_2 = torch.tensor([[9, 10, 11], [13, 14, 15]], dtype=torch.long)
+    out_single_list = [
+        predictor(ctx_tokens, ctx_idx, tgt_idx),
+        predictor(ctx_tokens, ctx_idx, tgt_idx_2),
+    ]
+    out_multi_list = predictor.forward_multi(ctx_tokens, ctx_idx, [tgt_idx, tgt_idx_2])
+    assert len(out_multi_list) == 2
+    for s, m in zip(out_single_list, out_multi_list):
+        assert torch.allclose(s, m, atol=1e-5)

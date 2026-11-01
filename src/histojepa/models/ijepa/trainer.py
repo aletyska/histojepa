@@ -6,6 +6,7 @@ checkpoint save/resume, and frozen Context Encoder export for Phase 2.
 """
 
 from dataclasses import asdict, dataclass, field
+import gc
 import json
 from pathlib import Path
 import time
@@ -121,19 +122,22 @@ class IJepaTrainer:
         else:
             self.device = torch.device(device)
 
-        # Set manual seeds for reproducibility
+        # Set manual seeds for reproducibility and Tensor Core matmul precision
         torch.manual_seed(config.optimization.seed)
         if self.device.type == "cuda":
+            gc.collect()
+            torch.cuda.empty_cache()
             torch.cuda.manual_seed_all(config.optimization.seed)
+            torch.set_float32_matmul_precision("high")
 
         # 1. Instantiate Model
         self.model = IJEPA(config).to(self.device)
 
-        # Optional gradient checkpointing
-        if config.optimization.gradient_checkpointing and hasattr(
-            self.model.context_encoder.vit, "gradient_checkpointing_enable"
-        ):
-            self.model.context_encoder.vit.gradient_checkpointing_enable()
+        # Optional gradient checkpointing (context encoder + predictor)
+        if config.optimization.gradient_checkpointing:
+            if hasattr(self.model.context_encoder.vit, "gradient_checkpointing_enable"):
+                self.model.context_encoder.vit.gradient_checkpointing_enable()
+            self.model.predictor.gradient_checkpointing = True
 
         # 2. Dataset, Mask Collator, and DataLoader
         self.dataset = ProcessedImageDataset(
@@ -142,7 +146,14 @@ class IJepaTrainer:
             image_size=config.data.image_size,
             mean=config.data.mean,
             std=config.data.std,
+            return_uint8=(self.device.type == "cuda"),
         )
+        self._gpu_mean = torch.tensor(
+            config.data.mean, dtype=torch.float32, device=self.device
+        ).view(1, 3, 1, 1)
+        self._gpu_std = torch.tensor(
+            config.data.std, dtype=torch.float32, device=self.device
+        ).view(1, 3, 1, 1)
 
         p_sz = config.model_encoder.patch_size
         img_sz = config.data.image_size
@@ -159,13 +170,16 @@ class IJepaTrainer:
             seed=config.optimization.seed,
         )
 
+        num_workers = config.data.num_workers
         self.dataloader = DataLoader(
             self.dataset,
             batch_size=config.optimization.micro_batch_size,
             shuffle=True,
-            num_workers=config.data.num_workers,
+            num_workers=num_workers,
             collate_fn=self.collator,
             pin_memory=(self.device.type == "cuda"),
+            persistent_workers=(num_workers > 0),
+            prefetch_factor=2 if num_workers > 0 else None,
             drop_last=True,
         )
 
@@ -209,6 +223,7 @@ class IJepaTrainer:
             lr=start_lr,
             betas=(0.9, 0.999),
             eps=1e-8,
+            fused=(self.device.type == "cuda"),
         )
 
         # Tracking state
@@ -226,7 +241,7 @@ class IJepaTrainer:
     ) -> float:
         """Trains for a single epoch across micro-batches and gradient accumulation steps."""
         self.model.train()
-        accum_loss = 0.0
+        accum_loss_tensor = torch.zeros((), dtype=torch.float32, device=self.device)
         epoch_losses: List[float] = []
 
         # AMP precision setup
@@ -238,21 +253,36 @@ class IJepaTrainer:
         use_amp = self.device.type == "cuda" and amp_dtype != torch.float32
 
         self.optimizer.zero_grad(set_to_none=True)
+        num_micro_batches = len(self.dataloader)
 
         for micro_idx, (images, ctx_idx, tgt_idx_list) in enumerate(self.dataloader):
-            images = images.to(self.device, non_blocking=True)
+            is_step_end = (
+                (micro_idx + 1) % self.grad_accum == 0
+                or (micro_idx + 1) == num_micro_batches
+            )
+
+            if images.dtype == torch.uint8:
+                images = (
+                    images.to(self.device, dtype=torch.float32, non_blocking=True)
+                    .div_(255.0)
+                    .sub_(self._gpu_mean)
+                    .div_(self._gpu_std)
+                )
+            else:
+                images = images.to(self.device, non_blocking=True)
+
             ctx_idx = ctx_idx.to(self.device, non_blocking=True)
             tgt_idx_list = [t.to(self.device, non_blocking=True) for t in tgt_idx_list]
 
             with torch.amp.autocast(device_type=self.device.type, dtype=amp_dtype, enabled=use_amp):
-                output = self.model(images, ctx_idx, tgt_idx_list)
+                output = self.model(images, ctx_idx, tgt_idx_list, compute_stats=is_step_end)
                 loss_scaled = output.loss / self.grad_accum
 
             loss_scaled.backward()
-            accum_loss += float(output.loss.detach().item())
+            accum_loss_tensor.add_(output.loss.detach())
 
             # When gradient accumulation completes, execute optimizer step
-            if (micro_idx + 1) % self.grad_accum == 0 or (micro_idx + 1) == len(self.dataloader):
+            if is_step_end:
                 cur_step = self.global_step
                 scheduled_lr = self.lr_schedule(cur_step)
                 scheduled_wd = self.wd_schedule(cur_step)
@@ -270,9 +300,10 @@ class IJepaTrainer:
                 # Target encoder EMA update
                 self.model.momentum_update(scheduled_momentum)
 
-                step_loss = accum_loss / min(self.grad_accum, (micro_idx % self.grad_accum) + 1)
+                step_divisor = min(self.grad_accum, (micro_idx % self.grad_accum) + 1)
+                step_loss = float(accum_loss_tensor.item()) / step_divisor
                 epoch_losses.append(step_loss)
-                accum_loss = 0.0
+                accum_loss_tensor.zero_()
 
                 step_info = StepInfo(
                     epoch=epoch,
