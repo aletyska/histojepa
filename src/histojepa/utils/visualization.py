@@ -157,3 +157,82 @@ def draw_ijepa_masks(
     ax.set_xlim(0, img_w)
     ax.set_ylim(img_h, 0)
     ax.axis("off")
+
+
+def draw_detection_comparison(
+    ax: matplotlib.axes.Axes,
+    image_rgb: np.ndarray,
+    gt_boxes: Union[Sequence[Sequence[float]], torch.Tensor, np.ndarray],
+    pred_boxes: Union[Sequence[Sequence[float]], torch.Tensor, np.ndarray],
+    pred_scores: Optional[Union[Sequence[float], torch.Tensor, np.ndarray]] = None,
+    gt_color: str = "#00E676",
+    pred_color: str = "#FF1744",
+) -> None:
+    """Renders Ground-Truth vs. ViTDet Predicted [x1, y1, x2, y2] bounding boxes onto an Axes.
+
+    Args:
+        ax: Matplotlib axes to render onto.
+        image_rgb: RGB image array of shape (H, W, 3).
+        gt_boxes: Ground-truth boxes of shape (M, 4) in pixel [x1, y1, x2, y2] format.
+        pred_boxes: Predicted boxes of shape (K, 4) in pixel [x1, y1, x2, y2] format.
+        pred_scores: Optional confidence scores of shape (K,).
+        gt_color: Hex color for ground-truth boxes (default: vivid green).
+        pred_color: Hex color for predicted boxes (default: vivid red).
+    """
+    ax.imshow(image_rgb)
+
+    gt_arr = np.asarray(
+        gt_boxes.detach().cpu().numpy() if isinstance(gt_boxes, torch.Tensor) else gt_boxes,
+        dtype=np.float32,
+    ).reshape(-1, 4)
+    pred_arr = np.asarray(
+        pred_boxes.detach().cpu().numpy() if isinstance(pred_boxes, torch.Tensor) else pred_boxes,
+        dtype=np.float32,
+    ).reshape(-1, 4)
+
+    scores_arr: Optional[np.ndarray] = None
+    if pred_scores is not None:
+        scores_arr = np.asarray(
+            pred_scores.detach().cpu().numpy() if isinstance(pred_scores, torch.Tensor) else pred_scores,
+            dtype=np.float32,
+        ).reshape(-1)
+
+    for idx, (x1, y1, x2, y2) in enumerate(gt_arr):
+        rect = patches.Rectangle(
+            (float(x1), float(y1)),
+            float(max(1.0, x2 - x1)),
+            float(max(1.0, y2 - y1)),
+            linewidth=2.0,
+            edgecolor=gt_color,
+            facecolor="none",
+            label="Ground Truth TB" if idx == 0 else None,
+        )
+        ax.add_patch(rect)
+
+    for idx, (x1, y1, x2, y2) in enumerate(pred_arr):
+        rect = patches.Rectangle(
+            (float(x1), float(y1)),
+            float(max(1.0, x2 - x1)),
+            float(max(1.0, y2 - y1)),
+            linewidth=1.8,
+            linestyle="--",
+            edgecolor=pred_color,
+            facecolor="none",
+            label="ViTDet Prediction" if idx == 0 else None,
+        )
+        ax.add_patch(rect)
+        if scores_arr is not None and idx < scores_arr.size:
+            ax.text(
+                float(x1),
+                max(12.0, float(y1) - 4.0),
+                f"{scores_arr[idx]:.2f}",
+                color="white",
+                fontsize=7.5,
+                fontweight="bold",
+                bbox={"facecolor": pred_color, "alpha": 0.75, "pad": 1.2, "edgecolor": "none"},
+            )
+
+    img_h, img_w = image_rgb.shape[:2]
+    ax.set_xlim(0, img_w)
+    ax.set_ylim(img_h, 0)
+    ax.axis("off")

@@ -13,6 +13,12 @@ from histojepa.data.pipeline import (
     SUPPORTED_SPLITS,
 )
 from histojepa.data.ijepa_dataset import ProcessedImageDataset
+from histojepa.data.detection_dataset import (
+    TBYoloDetectionDataset,
+    detection_collate_fn,
+    load_yolo_boxes_and_labels,
+    yolo_to_xyxy,
+)
 
 __all__ = [
     "OtsuSegmenter",
@@ -24,4 +30,8 @@ __all__ = [
     "ProcessingStats",
     "SUPPORTED_SPLITS",
     "ProcessedImageDataset",
+    "TBYoloDetectionDataset",
+    "detection_collate_fn",
+    "load_yolo_boxes_and_labels",
+    "yolo_to_xyxy",
 ]

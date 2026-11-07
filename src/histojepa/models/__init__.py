@@ -7,6 +7,14 @@ from histojepa.models.ijepa import (
     load_frozen_context_encoder,
     save_frozen_context_encoder,
 )
+from histojepa.models.vitdet import (
+    BranchAConfig,
+    HistoJEPA_ViTDet,
+    LayerNorm2d,
+    SimpleFeaturePyramid,
+    ViTDetHead,
+    ViTDetTrainer,
+)
 
 __all__ = [
     "IJEPA",
@@ -14,4 +22,10 @@ __all__ = [
     "IJepaPredictor",
     "save_frozen_context_encoder",
     "load_frozen_context_encoder",
+    "BranchAConfig",
+    "LayerNorm2d",
+    "SimpleFeaturePyramid",
+    "ViTDetHead",
+    "HistoJEPA_ViTDet",
+    "ViTDetTrainer",
 ]
